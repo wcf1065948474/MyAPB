@@ -40,33 +40,35 @@ if __name__ == '__main__':
         epoch_iter = 0                  # the number of training iterations in current epoch, reset to 0 every epoch
 
         for i, data in enumerate(dataset):  # inner loop within one epoch
-            iter_start_time = time.time()  # timer for computation per iteration
-            if total_iters % opt.print_freq == 0:
-                t_data = iter_start_time - iter_data_time
-            total_iters += opt.batch_size
-            epoch_iter += opt.batch_size
-            model.set_input(data)         # unpack data from dataset and apply preprocessing
-            model.optimize_parameters()   # calculate loss functions, get gradients, update network weights
+            for idx in range(opt.crop_len):
+                iter_start_time = time.time()  # timer for computation per iteration
+                if total_iters % opt.print_freq == 0:
+                    t_data = iter_start_time - iter_data_time
+                total_iters += opt.batch_size
+                epoch_iter += opt.batch_size
+                one_data = {'A':data['A'],'B':data['B'][:,idx],'label':data['label'][:,idx],'audio':data['audio'][:,idx]}
+                model.set_input(one_data,idx)         # unpack data from dataset and apply preprocessing
+                model.optimize_parameters()   # calculate loss functions, get gradients, update network weights
 
-            if total_iters % opt.display_freq == 0:   # display images on visdom and save images to a HTML file
-                save_result = total_iters % opt.update_html_freq == 0
-                model.compute_visuals()
-                util.save_many_images_from_dict(model.get_current_visuals(),"result/{}_{}.jpg".format(epoch,save_result))
+                if total_iters % opt.display_freq == 0:   # display images on visdom and save images to a HTML file
+                    save_result = total_iters % opt.update_html_freq == 0
+                    model.compute_visuals()
+                    util.save_many_images_from_dict(model.get_current_visuals(),"result/{}_{}.jpg".format(epoch,save_result))
 
-            if total_iters % opt.print_freq == 0:    # print training losses and save logging information to the disk
-                losses = model.get_current_losses()
-                t_comp = (time.time() - iter_start_time) / opt.batch_size
-                print("epoch={},epoch_iter={},losses={},t_comp={},t_data={}".format(epoch,epoch_iter,losses,t_comp,t_data))
-                # visualizer.print_current_losses(epoch, epoch_iter, losses, t_comp, t_data)
-                # if opt.display_id > 0:
-                #     visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, losses)
+                if total_iters % opt.print_freq == 0:    # print training losses and save logging information to the disk
+                    losses = model.get_current_losses()
+                    t_comp = (time.time() - iter_start_time) / opt.batch_size
+                    print("epoch={},epoch_iter={},losses={},t_comp={},t_data={}".format(epoch,epoch_iter,losses,t_comp,t_data))
+                    # visualizer.print_current_losses(epoch, epoch_iter, losses, t_comp, t_data)
+                    # if opt.display_id > 0:
+                    #     visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, losses)
 
-            if total_iters % opt.save_latest_freq == 0:   # cache our latest model every <save_latest_freq> iterations
-                print('saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iters))
-                save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
-                model.save_networks(save_suffix)
+                if total_iters % opt.save_latest_freq == 0:   # cache our latest model every <save_latest_freq> iterations
+                    print('saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iters))
+                    save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
+                    model.save_networks(save_suffix)
 
-            iter_data_time = time.time()
+                iter_data_time = time.time()
         if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')

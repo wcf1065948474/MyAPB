@@ -130,12 +130,7 @@ class ResnetL2FaceGenerator(nn.Module):
         mult = 2 ** n_downsampling
         model2 = []
         for i in range(self.n_blocks):
-            if i==0:
-                model2 += [ResnetBlock(640,320, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
-            elif i==1:
-                model2 += [ResnetBlock(320,256, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
-            else:
-                model2 += [ResnetBlock(ngf * mult, ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
+            model2 += [ResnetBlock(ngf * mult, ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
 
 
         model3 = []
@@ -156,16 +151,18 @@ class ResnetL2FaceGenerator(nn.Module):
         self.model_prev = nn.Sequential(*model_prev)
         self.model2 = nn.Sequential(*model2)
         self.model3 = nn.Sequential(*model3)
+        self.attention = SptialAttentionFusion()
 
     def forward(self, ref_img,prev_img,landmark,mfcc):
         """Standard forward"""
         x_ref = self.model_ref(torch.cat([ref_img,landmark],1))
         x_prev = self.model_prev(torch.cat([prev_img,landmark],1))
         x_audio = self.model_audio(mfcc)
-        x = self.model2(torch.cat([x_ref,x_prev,x_audio],1))
+        attn = self.attention(torch.cat([x_ref,x_prev,x_audio],1))
+        x = self.model2(x_ref*attn + x_prev*(1-attn))
         out = self.model3(x)
 
-        return out
+        return out,attn
 
 
 class ResnetBlock(nn.Module):
@@ -227,3 +224,22 @@ class ResnetBlock(nn.Module):
         """Forward function (with skip connections)"""
         out = self.shortcut(x) + self.conv_block(x)  # add skip connections
         return out
+
+
+class SptialAttentionFusion(nn.Module):
+    def __init__(self):
+        super(SptialAttentionFusion,self).__init__()
+        self.model = nn.Sequential(
+            nn.Conv2d(640,160,3,1,1),
+            nn.BatchNorm2d(160),
+            nn.ReLU(),
+            nn.Conv2d(160,64,3,1,1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.Conv2d(64,1,3,1,1),
+            nn.BatchNorm2d(1),
+            nn.Sigmoid(),
+        )
+    def forward(self,x):
+        x = self.model(x)
+        return x

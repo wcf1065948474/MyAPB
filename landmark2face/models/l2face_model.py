@@ -14,7 +14,7 @@ class L2FaceModel(BaseModel):
     def __init__(self, opt):
         BaseModel.__init__(self, opt)
         self.loss_names = ['G_GAN', 'G_L1', 'D_real', 'D_fake']
-        self.visual_names = ['real_A', 'fake_B', 'real_B']
+        self.visual_names = ['real_A', 'prev', 'attn','real_B','fake_B']
         if self.isTrain:
             self.model_names = ['G', 'D']
         else:
@@ -34,15 +34,16 @@ class L2FaceModel(BaseModel):
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
 
-    def set_input(self, input):
-        self.real_A = input['A'].to(self.device)
-        self.prev   = input['A'].to(self.device)
+    def set_input(self, input, idx):
+        if idx==0:
+            self.real_A = input['A'].to(self.device)
+            self.prev   = input['A'].to(self.device)
         self.audio = input['audio'].to(self.device)
         self.real_B = input['B'].to(self.device)
         self.label = input['label'].to(self.device)
 
     def forward(self):
-        self.fake_B = self.netG(self.real_A,self.prev,self.label,self.audio)
+        self.fake_B,self.attn = self.netG(self.real_A,self.prev,self.label,self.audio)
         self.prev = self.fake_B.detach()
 
     def backward_D(self):

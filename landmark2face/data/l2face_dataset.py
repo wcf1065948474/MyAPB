@@ -60,6 +60,7 @@ import numpy as np
 class L2FaceDataset(BaseDataset):
     def __init__(self,opt):
         BaseDataset.__init__(self,opt)
+        self.crop_len = opt.crop_len
         self.image_dir = "256_image_crop"
         self.label_dir = "256_landmark_crop_thin"
         filename = "256_train.t7"
@@ -72,21 +73,31 @@ class L2FaceDataset(BaseDataset):
                                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
     def __getitem__(self,index):
-        name = self.img[index][0].split('/')[1]
         random_idx = random.randint(0,len(self.audio)-1)
         random_name = self.img[random_idx][0].split('/')[1]
         imageA = Image.open(os.path.join(self.root_dir,self.image_dir,random_name))
-        audio = self.audio[index][None]
-        imageB = Image.open(os.path.join(self.root_dir,self.image_dir,name))
-        labelB = Image.open(os.path.join(self.root_dir,self.label_dir,name))
-
         imageA = self.transformsfunc(imageA)
-        imageB = self.transformsfunc(imageB)
-        labelB = self.transformsfunc(labelB)
+
+        audio_list = []
+        labelB_list = []
+        imageB_list = []
+        for i in range(self.crop_len):
+            name = self.img[index+i][0].split('/')[1]
+            audio = self.audio[index+i][None]
+            imageB = Image.open(os.path.join(self.root_dir,self.image_dir,name))
+            labelB = Image.open(os.path.join(self.root_dir,self.label_dir,name))
+            imageB = self.transformsfunc(imageB)
+            labelB = self.transformsfunc(labelB)
+            audio_list.append(audio)
+            labelB_list.append(labelB)
+            imageB_list.append(imageB)
+        imageB = torch.stack(imageB_list)
+        labelB = torch.stack(labelB_list)
+        audio  = np.stack(audio_list)
         return {'A': imageA, 'B': imageB, 'label': labelB, 'audio':audio}
 
     def __len__(self):
-        return len(self.audio)
+        return len(self.audio)-self.crop_len
 
 
 if __name__ == '__main__':

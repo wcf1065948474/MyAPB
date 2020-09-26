@@ -59,7 +59,12 @@ def save_image(image_numpy, image_path):
 def save_many_images_from_dict(dictimg,path):
     tensorlist = []
     for k in dictimg.keys():
-        tensorlist.append(dictimg[k])
+        if k=='attn':
+            tmp = torch.nn.functional.interpolate(dictimg[k],256)
+            tmp = tmp.expand(-1,3,-1,-1)
+            tensorlist.append(tmp)
+        else:
+            tensorlist.append(dictimg[k])
     imgs = torch.cat(tensorlist,3)
     imgs = tensor2im(imgs)
     save_image(imgs,path)
